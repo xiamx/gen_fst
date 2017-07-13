@@ -1,4 +1,4 @@
-defmodule GenFst.Mixfile do
+defmodule GenFST.Mixfile do
   use Mix.Project
 
   def project do
@@ -30,7 +30,8 @@ defmodule GenFst.Mixfile do
   defp deps do
     [
       {:gen_state_machine, "~> 2.0"},
-      {:libgraph, "~> 0.9"}
+      {:libgraph, "~> 0.9"},
+      {:ex_doc, "~> 0.14", only: :dev, runtime: false}
     ]
   end
 end
