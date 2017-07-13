@@ -1,0 +1,2 @@
+%{"gen_state_machine": {:hex, :gen_state_machine, "2.0.0", "f3bc7d961e4cd9f37944b379137e25fd063feffc42800bed69197fd1b78b3151", [:mix], [], "hexpm"},
+  "libgraph": {:hex, :libgraph, "0.9.0", "26e29318099c0e637a573d7fc88a4757b7474c5ea57206180d348657ac46cd3b", [:mix], [], "hexpm"}}
