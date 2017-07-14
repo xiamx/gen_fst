@@ -37,7 +37,7 @@ assert MorphologicalParser.parse("acts") == "act^s"
 
 For example if we pass the third-person singluar tense of the verb _act_,
 `MorphologicalParser.parse("acts")`, the morphological parser will output
-`"act^s"`. The semantic of rule definition is given at `rule/1`.
+`"act^s"`. The semantic of rule definition is given at [`rule/1`](https://hexdocs.pm/gen_fst/GenFST.html#rule/1).
 
 
 ## Installation
