@@ -7,6 +7,10 @@ defmodule GenFST.Mixfile do
      elixir: "~> 1.4",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+     description: description(),
+     package: package(),
+     source_url: "https://github.com/xiamx/gen_fst",
+     homepage_url: "https://github.com/xiamx/gen_fst",
      deps: deps()]
   end
 
@@ -32,6 +36,24 @@ defmodule GenFST.Mixfile do
       {:gen_state_machine, "~> 2.0"},
       {:libgraph, "~> 0.9"},
       {:ex_doc, "~> 0.14", only: :dev, runtime: false}
+    ]
+  end
+
+  defp description do
+    """
+    GenFST implements a generic finite state transducer
+    with customizable rules elegantly expressed in a DSL.
+    """
+  end
+
+  defp package do
+    # These are the default files included in the package
+    [
+      name: :gen_fst,
+      files: ["lib", "mix.exs", "README*", "LICENSE*"],
+      maintainers: ["Meng Xuan Xia"],
+      licenses: ["Apache 2.0"],
+      links: %{"GitHub" => "https://github.com/xiamx/gen_fst"}
     ]
   end
 end
