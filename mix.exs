@@ -9,8 +9,7 @@ defmodule GenFST.Mixfile do
      start_permanent: Mix.env == :prod,
      description: description(),
      package: package(),
-     docs: [main: "readme",
-       extras: ["README.md"]],
+     docs: [main: "GenFST"],
      source_url: "https://github.com/xiamx/gen_fst",
      homepage_url: "https://github.com/xiamx/gen_fst",
      deps: deps()]
