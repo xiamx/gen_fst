@@ -77,12 +77,50 @@ defmodule GenFST do
       end)
     else
       {from, to} = rule_item
-      new_prefix = prefix <> from
-      target_v = String.to_atom(new_prefix)
-      edge = Graph.Edge.new(vertex, target_v, label: {from, to})
-      fst_graph = fst_graph
-      |> Graph.add_edge(edge)
-      {fst_graph, target_v, new_prefix}
+      from_len = String.length from
+      to_len = String.length to
+      cond do
+        from_len > to_len ->
+          h_from = String.slice(from, 0, to_len)
+          h_to = String.slice(from, 0, to_len)
+          h_cps_pairs = Enum.zip(String.codepoints(h_from), String.codepoints(h_to))
+
+          {fst_graph, vertex, prefix} = Enum.reduce(h_cps_pairs,
+                      {fst_graph, vertex, prefix}, 
+                      fn({from_cp, to_cp}, {fst_graph, vertex, prefix}) -> 
+            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp})
+          end)
+
+          t_from_cps = String.codepoints(String.slice(from, to_len, from_len))
+          {fst_graph, vertex, prefix} = Enum.reduce(t_from_cps,
+                      {fst_graph, vertex, prefix}, 
+                      fn(t_from_cp, {fst_graph, vertex, prefix}) -> 
+            process_rule_item_char(fst_graph, vertex, prefix, {t_from_cp, ""})
+          end)
+
+        from_len < to_len -> 
+          h_from = String.slice(from, 0, from_len - 1)
+          h_to = String.slice(to, 0, from_len - 1)
+          h_cps_pairs = Enum.zip(String.codepoints(h_from), String.codepoints(h_to))
+          {fst_graph, vertex, prefix} = Enum.reduce(h_cps_pairs,
+                      {fst_graph, vertex, prefix}, 
+                      fn({from_cp, to_cp}, {fst_graph, vertex, prefix}) -> 
+            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp})
+          end)
+          process_rule_item_char(fst_graph, vertex, prefix, {
+            String.slice(from, from_len - 1, from_len),
+            String.slice(to, from_len - 1, to_len)
+          })
+
+        from_len == to_len ->
+          cps_pairs = Enum.zip(String.codepoints(from), String.codepoints(to))
+          Enum.reduce(cps_pairs,
+                      {fst_graph, vertex, prefix}, 
+                      fn({from_cp, to_cp}, {fst_graph, vertex, prefix}) -> 
+            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp})
+          end)
+
+      end
     end
   end
 
