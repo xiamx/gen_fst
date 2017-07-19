@@ -25,20 +25,18 @@ Here we implement a simple morphological parser for English language. This
 morphological parser recognize different inflectional morphology of the verbs.
 
 ```elixir
-defmodule MorphologicalParser do
-  use GenFST
+fst = GenFST.new
+|> GenFST.rule(["play", {"s", "^s"}])
+|> GenFST.rule(["act", {"s", "^s"}])
+|> GenFST.rule(["act", {"ed", "^ed"}])
+|> GenFST.rule(["act", {"ing", ""}])
 
-  rule ["play", {"s", "^s"}]
-  rule ["act", {"s", "^s"}]
-
-end
-assert MorphologicalParser.parse("acts") == "act^s"
+assert "play^s" == fst |> GenFST.parse("plays")
 ```
 
 For example if we pass the third-person singluar tense of the verb _act_,
-`MorphologicalParser.parse("acts")`, the morphological parser will output
-`"act^s"`. The semantic of rule definition is given at [`rule/1`](https://hexdocs.pm/gen_fst/GenFST.html#rule/1).
-
+`GenFST.parse(fst, "acts")`, the morphological parser will output
+`"act^s"`. The semantic of rule definition is given at [`rule/2`](https://hexdocs.pm/gen_fst/GenFST.html#rule/2).
 
 ## Installation
 

@@ -21,59 +21,106 @@ defmodule GenFST do
   morphological parser recognize different inflectional morphology of the verbs.
 
   ```elixir
-  defmodule MorphologicalParser do
-    use GenFST
+  fst = GenFST.new
+  |> GenFST.rule(["play", {"s", "^s"}])
+  |> GenFST.rule(["act", {"s", "^s"}])
+  |> GenFST.rule(["act", {"ed", "^ed"}])
+  |> GenFST.rule(["act", {"ing", ""}])
 
-    rule ["play", {"s", "^s"}]
-    rule ["act", {"s", "^s"}]
-
-  end
-  assert MorphologicalParser.parse("plays") == "play^s"
+  assert "play^s" == fst |> GenFST.parse("plays")
   ```
 
   For example if we pass the third-person singluar tense of the verb _act_,
-  `MorphologicalParser.parse("acts")`, the morphological parser will output
-  `"act^s"`. The semantic of rule definition is given at `rule/1`.
+  `GenFST.parse(fst, "acts")`, the morphological parser will output
+  `"act^s"`. The semantic of rule definition is given at `rule/2`.
 
   """
 
-  defmacro __using__(_opts) do
-    quote location: :keep do 
-      @rules []
-      @before_compile GenFST
+  @opaque fst :: %Graph{}
 
-      import GenFST
-    end
+  @doc """
+  Create a new finite state transducer.
+
+  See example usage in [Module Example](#module-example)
+  """
+  @spec new :: fst
+  def new do
+    Graph.new
   end
 
   @doc """
-  Define a transducing rule.
+  Define a transducing rule, adding it to the fst
 
-  A transducing rule is a `List` of `String | {String, String}`.
+  A transducing rule is a `List` of `String.t | {String.t, String.t}`.
 
-  For example: `rule ["play", {"s", "^s"}]` means outputing `"play"` verbatimly,
+  For example: `rule fst, ["play", {"s", "^s"}]` means outputing `"play"` verbatimly,
   and transform `"s"` into `"^s"`. If a finite state transducer built with
   this rule is fed with string `"plays"`, then the output will be `"play^s"`
+
+  See example usage in [Module Example](#module-example)
   """
-  defmacro rule(r) do
-    quote do 
-      @rules [unquote(r) | @rules]
+  @type fst_rule :: String.t | {String.t, String.t}
+  @spec rule(fst, [fst_rule]) :: fst
+  def rule(fst, r) do
+    process_rule(fst, r)
+  end
+
+  @doc """
+  Parse the input by transducing it with the given fst.
+
+  See example usage in [Module Example](#module-example)
+  """
+  @spec parse(fst, String.t) :: String.t
+  def parse(fst, input) do
+    input_cps = String.codepoints(input)
+    transduced = transduce(fst, input_cps, {:root, :initial}, "")
+    transduced_len = Enum.count(transduced)
+
+    cond do
+      transduced_len == 0 ->
+        {:error, "not possible"}
+      transduced_len == 1 ->
+        {:ok, List.first(transduced)}
+      transduced_len > 1 ->
+        {:ambigious, transduced}
+    end
+
+  end
+
+  defp transduce(_fst_graph, [] = _input_cps, state, transduced) do
+    if {_, :terminal} = state do
+      [transduced]
+    else
+      nil
     end
   end
 
+  defp transduce(fst_graph, [x | xs] = _input_cps, state, transduced) do
+    edges = Enum.filter(Graph.out_edges(fst_graph, state), fn(edge) -> 
+      {e_from, _e_to} = edge.label
+      e_from == x
+    end)
+    
+    possible_transduced = for edge <- edges do
+      transduce(fst_graph, xs, edge.v2, transduced <> elem(edge.label, 1))
+    end
+    List.flatten(Enum.filter(possible_transduced, fn(x) -> x end))
+  end
+
   @doc false
-  def process_rule(fst_graph, rule) do
-    {fst_graph, _, _} =  Enum.reduce(rule, {fst_graph, :root, ""}, fn(rule_item, {fst_graph, vertex, prefix}) ->
-      process_rule_item(fst_graph, vertex, prefix, rule_item)
+  defp process_rule(fst_graph, rule) do
+    rule_length = Enum.count(rule)
+    {fst_graph, _, _} =  Enum.reduce(Enum.with_index(rule), {fst_graph, {:root, :initial}, ""}, fn({rule_item, i}, {fst_graph, vertex, prefix}) ->
+      process_rule_item(fst_graph, vertex, prefix, rule_item, i == rule_length - 1)
     end)
     fst_graph
   end
 
   @doc false
-  def process_rule_item(fst_graph, vertex, prefix, rule_item) do
+  defp process_rule_item(fst_graph, vertex, prefix, rule_item, is_terminal) do
     if is_binary rule_item do
       Enum.reduce(String.codepoints(rule_item), {fst_graph, vertex, prefix}, fn(char, {fst_graph, vertex, prefix}) -> 
-        process_rule_item_char(fst_graph, vertex, prefix, {char, char})
+        process_rule_item_char(fst_graph, vertex, prefix, {char, char}, is_terminal)
       end)
     else
       {from, to} = rule_item
@@ -88,14 +135,15 @@ defmodule GenFST do
           {fst_graph, vertex, prefix} = Enum.reduce(h_cps_pairs,
                       {fst_graph, vertex, prefix}, 
                       fn({from_cp, to_cp}, {fst_graph, vertex, prefix}) -> 
-            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp})
+            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp}, false)
           end)
 
           t_from_cps = String.codepoints(String.slice(from, to_len, from_len))
-          {fst_graph, vertex, prefix} = Enum.reduce(t_from_cps,
+          t_from_cps_len = Enum.count(t_from_cps)
+          {fst_graph, vertex, prefix} = Enum.reduce(Enum.with_index(t_from_cps),
                       {fst_graph, vertex, prefix}, 
-                      fn(t_from_cp, {fst_graph, vertex, prefix}) -> 
-            process_rule_item_char(fst_graph, vertex, prefix, {t_from_cp, ""})
+                      fn({t_from_cp, i}, {fst_graph, vertex, prefix}) -> 
+            process_rule_item_char(fst_graph, vertex, prefix, {t_from_cp, ""}, t_from_cps_len - 1 == i)
           end)
 
         from_len < to_len -> 
@@ -105,19 +153,20 @@ defmodule GenFST do
           {fst_graph, vertex, prefix} = Enum.reduce(h_cps_pairs,
                       {fst_graph, vertex, prefix}, 
                       fn({from_cp, to_cp}, {fst_graph, vertex, prefix}) -> 
-            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp})
+            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp}, false)
           end)
           process_rule_item_char(fst_graph, vertex, prefix, {
             String.slice(from, from_len - 1, from_len),
             String.slice(to, from_len - 1, to_len)
-          })
+          }, true)
 
         from_len == to_len ->
           cps_pairs = Enum.zip(String.codepoints(from), String.codepoints(to))
-          Enum.reduce(cps_pairs,
+          cps_pairs_len = Enum.count(cps_pairs)
+          Enum.reduce(Enum.with_index(cps_pairs),
                       {fst_graph, vertex, prefix}, 
-                      fn({from_cp, to_cp}, {fst_graph, vertex, prefix}) -> 
-            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp})
+                      fn({{from_cp, to_cp}, i}, {fst_graph, vertex, prefix}) -> 
+            process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp}, i == cps_pairs_len - 1)
           end)
 
       end
@@ -125,43 +174,14 @@ defmodule GenFST do
   end
 
   @doc false
-  def process_rule_item_char(fst_graph, vertex, prefix, {from, to}) do
+  defp process_rule_item_char(fst_graph, vertex, prefix, {from, to}, is_terminal) do
     new_prefix = prefix <> from
-    target_v = String.to_atom(new_prefix)
-    edge = Graph.Edge.new(vertex, target_v, label: {from, to})
-    fst_graph = fst_graph
-    |> Graph.add_edge(edge)
-    {fst_graph, target_v, new_prefix}
-  end
-
-  # Invoked right before target module compiled, used to inject
-  # GenStateMachine event handlers.
-  @doc false
-  defmacro __before_compile__(_env) do
-    quote location: :keep do
-      @fst_graph Enum.reduce(@rules, Graph.new(), fn(rule, fst_graph) -> 
-        fst_graph |> process_rule(rule)
-      end)
-
-      def transduce(alphabet, state, transduced) do
-        edge = Enum.find(Graph.out_edges(@fst_graph, state), nil, fn(edge) -> 
-          {e_from, e_to} = edge.label
-          e_from == alphabet
-        end)
-
-        transduced = transduced <> elem(edge.label, 1)
-        {edge.v2, transduced}
-      end
-
-      @initial_state_data {:root, ""}
-      def parse(input) do
-        input_cps = String.codepoints(input)
-        {final_state, transduced} = Enum.reduce(input_cps, @initial_state_data, 
-          fn(a, {state, transduced}) -> 
-          transduce(a, state, transduced)
-        end)
-        transduced
-      end
+    target_v = if is_terminal do
+      {new_prefix <> ":" <> to, :terminal}
+    else
+      {new_prefix <> ":" <> to, :transitional}
     end
+    edge = Graph.Edge.new(vertex, target_v, label: {from, to})
+    {Graph.add_edge(fst_graph, edge), target_v, new_prefix}
   end
 end
