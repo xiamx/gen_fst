@@ -45,7 +45,7 @@ dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:gen_fst, "~> 0.1.0"}]
+  [{:gen_fst, "~> 0.4.0"}]
 end
 ```
 
