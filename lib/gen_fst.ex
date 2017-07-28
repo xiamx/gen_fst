@@ -88,7 +88,7 @@ defmodule GenFST do
   end
 
   defp transduce(_fst_graph, [] = _input_cps, state, transduced) do
-    if {_, :terminal} = state do
+    if elem(state, 1) == :terminal do
       [transduced]
     else
       nil
