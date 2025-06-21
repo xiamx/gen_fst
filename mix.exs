@@ -1,7 +1,7 @@
 defmodule GenFST.Mixfile do
   use Mix.Project
 
-  @version "0.4.2"
+  @version "0.5.0"
   @source_url "https://github.com/xiamx/gen_fst"
 
   def project do
