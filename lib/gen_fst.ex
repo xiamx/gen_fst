@@ -135,94 +135,108 @@ defmodule GenFST do
 
   @doc false
   @spec process_rule_item(fst, tuple, String.t(), fst_rule, boolean) :: {fst, tuple, String.t()}
-  defp process_rule_item(fst_graph, vertex, prefix, rule_item, is_terminal) do
-    if is_binary(rule_item) do
-      Enum.reduce(String.codepoints(rule_item), {fst_graph, vertex, prefix}, fn char,
-                                                                                {fst_graph, vertex,
-                                                                                 prefix} ->
-        process_rule_item_char(fst_graph, vertex, prefix, {char, char}, is_terminal)
-      end)
-    else
-      {from, to} = rule_item
-      from_len = String.length(from)
-      to_len = String.length(to)
+  defp process_rule_item(fst_graph, vertex, prefix, rule_item, is_terminal)
+       when is_binary(rule_item) do
+    Enum.reduce(String.codepoints(rule_item), {fst_graph, vertex, prefix}, fn char,
+                                                                              {fst_graph, vertex,
+                                                                               prefix} ->
+      process_rule_item_char(fst_graph, vertex, prefix, {char, char}, is_terminal)
+    end)
+  end
 
-      cond do
-        from_len > to_len ->
-          h_from = String.slice(from, 0, to_len)
-          h_to = String.slice(to, 0, to_len)
-          h_cps_pairs = Enum.zip(String.codepoints(h_from), String.codepoints(h_to))
+  defp process_rule_item(fst_graph, vertex, prefix, {from, to}, is_terminal) do
+    from_len = String.length(from)
+    to_len = String.length(to)
 
-          {fst_graph, vertex, prefix} =
-            Enum.reduce(
-              h_cps_pairs,
-              {fst_graph, vertex, prefix},
-              fn {from_cp, to_cp}, {fst_graph, vertex, prefix} ->
-                process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp}, false)
-              end
-            )
+    cond do
+      from_len > to_len ->
+        process_longer_from(fst_graph, vertex, prefix, from, to, is_terminal)
 
-          t_from_cps = String.codepoints(String.slice(from, to_len, from_len))
-          t_from_cps_len = Enum.count(t_from_cps)
+      from_len < to_len ->
+        process_shorter_from(fst_graph, vertex, prefix, from, to, is_terminal)
 
-          Enum.reduce(
-            Enum.with_index(t_from_cps),
-            {fst_graph, vertex, prefix},
-            fn {t_from_cp, i}, {fst_graph, vertex, prefix} ->
-              process_rule_item_char(
-                fst_graph,
-                vertex,
-                prefix,
-                {t_from_cp, ""},
-                t_from_cps_len - 1 == i and is_terminal
-              )
-            end
-          )
-
-        from_len < to_len ->
-          h_from = String.slice(from, 0, from_len - 1)
-          h_to = String.slice(to, 0, from_len - 1)
-          h_cps_pairs = Enum.zip(String.codepoints(h_from), String.codepoints(h_to))
-
-          {fst_graph, vertex, prefix} =
-            Enum.reduce(
-              h_cps_pairs,
-              {fst_graph, vertex, prefix},
-              fn {from_cp, to_cp}, {fst_graph, vertex, prefix} ->
-                process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp}, false)
-              end
-            )
-
-          process_rule_item_char(
-            fst_graph,
-            vertex,
-            prefix,
-            {
-              String.slice(from, from_len - 1, from_len),
-              String.slice(to, from_len - 1, to_len)
-            },
-            is_terminal
-          )
-
-        from_len == to_len ->
-          cps_pairs = Enum.zip(String.codepoints(from), String.codepoints(to))
-          cps_pairs_len = Enum.count(cps_pairs)
-
-          Enum.reduce(
-            Enum.with_index(cps_pairs),
-            {fst_graph, vertex, prefix},
-            fn {{from_cp, to_cp}, i}, {fst_graph, vertex, prefix} ->
-              process_rule_item_char(
-                fst_graph,
-                vertex,
-                prefix,
-                {from_cp, to_cp},
-                i == cps_pairs_len - 1 and is_terminal
-              )
-            end
-          )
-      end
+      from_len == to_len ->
+        process_equal_length(fst_graph, vertex, prefix, from, to, is_terminal)
     end
+  end
+
+  defp process_longer_from(fst_graph, vertex, prefix, from, to, is_terminal) do
+    to_len = String.length(to)
+    h_from = String.slice(from, 0, to_len)
+    h_to = String.slice(to, 0, to_len)
+    h_cps_pairs = Enum.zip(String.codepoints(h_from), String.codepoints(h_to))
+
+    {fst_graph, vertex, prefix} =
+      Enum.reduce(
+        h_cps_pairs,
+        {fst_graph, vertex, prefix},
+        fn {from_cp, to_cp}, {fst_graph, vertex, prefix} ->
+          process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp}, false)
+        end
+      )
+
+    t_from_cps = String.codepoints(String.slice(from, to_len, String.length(from)))
+    t_from_cps_len = Enum.count(t_from_cps)
+
+    Enum.reduce(
+      Enum.with_index(t_from_cps),
+      {fst_graph, vertex, prefix},
+      fn {t_from_cp, i}, {fst_graph, vertex, prefix} ->
+        process_rule_item_char(
+          fst_graph,
+          vertex,
+          prefix,
+          {t_from_cp, ""},
+          t_from_cps_len - 1 == i and is_terminal
+        )
+      end
+    )
+  end
+
+  defp process_shorter_from(fst_graph, vertex, prefix, from, to, is_terminal) do
+    from_len = String.length(from)
+    h_from = String.slice(from, 0, from_len - 1)
+    h_to = String.slice(to, 0, from_len - 1)
+    h_cps_pairs = Enum.zip(String.codepoints(h_from), String.codepoints(h_to))
+
+    {fst_graph, vertex, prefix} =
+      Enum.reduce(
+        h_cps_pairs,
+        {fst_graph, vertex, prefix},
+        fn {from_cp, to_cp}, {fst_graph, vertex, prefix} ->
+          process_rule_item_char(fst_graph, vertex, prefix, {from_cp, to_cp}, false)
+        end
+      )
+
+    process_rule_item_char(
+      fst_graph,
+      vertex,
+      prefix,
+      {
+        String.slice(from, from_len - 1, from_len),
+        String.slice(to, from_len - 1, String.length(to))
+      },
+      is_terminal
+    )
+  end
+
+  defp process_equal_length(fst_graph, vertex, prefix, from, to, is_terminal) do
+    cps_pairs = Enum.zip(String.codepoints(from), String.codepoints(to))
+    cps_pairs_len = Enum.count(cps_pairs)
+
+    Enum.reduce(
+      Enum.with_index(cps_pairs),
+      {fst_graph, vertex, prefix},
+      fn {{from_cp, to_cp}, i}, {fst_graph, vertex, prefix} ->
+        process_rule_item_char(
+          fst_graph,
+          vertex,
+          prefix,
+          {from_cp, to_cp},
+          i == cps_pairs_len - 1 and is_terminal
+        )
+      end
+    )
   end
 
   @doc false
