@@ -1,6 +1,6 @@
 # ![Elixir](https://hexdocs.pm/ex_unit/assets/logo.png) GenFST
 
-[![Build Status](https://travis-ci.org/xiamx/gen_fst.svg?branch=master)](https://travis-ci.org/xiamx/gen_fst)
+[![CI](https://github.com/xiamx/gen_fst/actions/workflows/ci.yml/badge.svg)](https://github.com/xiamx/gen_fst/actions/workflows/ci.yml)
 [![Hex.pm](https://img.shields.io/hexpm/v/gen_fst.svg)](https://hex.pm/packages/gen_fst)
 [![license](https://img.shields.io/github/license/xiamx/gen_fst.svg)](https://github.com/xiamx/gen_fst/blob/master/LICENSE)
 

@@ -43,7 +43,6 @@ defmodule GenFST.Mixfile do
   # Type "mix help deps" for more examples and options
   defp deps do
     [
-      {:gen_state_machine, "~> 3.0"},
       {:libgraph, "~> 0.16"},
 
       # Development dependencies
